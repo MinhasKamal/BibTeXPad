@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BibTeX Tool</title>
+<style>
+    /* Dark Theme (Default) */
+    :root {
+        --bg-color: #1e1e1e;
+        --panel-bg: #252526;
+        --text-color: #d4d4d4;
+        --border-color: #3e3e42;
+        --accent: #007acc;
+        --accent-hover: #005f9e;
+        --accent-rgb: 0, 122, 204; 
+        
+        --key-color: #569cd6;
+        --type-color: #c586c0;
+        --field-color: #9cdcfe;
+        --string-color: #ce9178;
+        --comment-color: #6a9955;
+    }
+
+    /* Light Theme */
+    :root[data-theme="light"] {
+        --bg-color: #ffffff;
+        --panel-bg: #f3f3f3;
+        --text-color: #333333;
+        --border-color: #cccccc;
+        --accent: #005f9e;
+        --accent-hover: #007acc;
+        --accent-rgb: 0, 95, 158;
+        
+        --key-color: #0000ff;
+        --type-color: #af00db;
+        --field-color: #001080;
+        --string-color: #a31515;
+        --comment-color: #008000;
+    }
+
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+        transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Left Panel: Controls */
+    #sidebar {
+        width: 320px;
+        background-color: var(--panel-bg);
+        border-right: 1px solid var(--border-color);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow-y: auto;
+        flex-shrink: 0;
+        transition: background-color 0.3s, border-color 0.3s;
+    }
+    
+    .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+    
+    .sidebar-header h2 { margin: 0; font-size: 1.3rem; color: var(--key-color); }
+    
+    #theme-btn {
+        background: #4A4A4A;
+        border: none;
+        color: var(--text-color);
+        font-size: 1.2rem;
+        cursor: pointer;
+        padding: 5px;
+        border-radius: 4px;
+    }
+    #theme-btn:hover { background-color: rgba(188, 188, 188, 0.5); }
+
+    .sidebar-divider {
+        border: 0;
+        border-top: 1px solid var(--border-color);
+        margin: 5px 0;
+        width: 100%;
+        transition: border-color 0.3s;
+    }
+
+    .group-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #858585;
+        margin-bottom: -5px;
+        font-weight: bold;
+    }
+
+    .control-group { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 0.9rem; font-weight: 500; }
+    input[type="text"] {
+        padding: 8px;
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        border-radius: 4px;
+    }
+    button.action-btn {
+        padding: 10px;
+        background-color: var(--accent);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: bold;
+        transition: background-color 0.2s;
+        text-align: left;
+    }
+    button.action-btn:hover { background-color: var(--accent-hover); }
+    
+    /* Right Panel: Editor Area */
+    #right-panel {
+        display: flex;
+        flex-grow: 1;
+        background-color: var(--bg-color);
+        height: 100%;
+        overflow: hidden;
+    }
+
+    #line-numbers {
+        width: 45px;
+        padding: 20px 10px 20px 5px;
+        text-align: right;
+        background-color: var(--panel-bg);
+        color: #858585;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        border-right: 1px solid var(--border-color);
+        user-select: none;
+        overflow: hidden;
+        flex-shrink: 0;
+        box-sizing: border-box;
+    }
+
+    #editor-container {
+        flex-grow: 1;
+        position: relative;
+    }
+    
+    #highlighting, #bibtex-input {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        width: 100%; height: 100%;
+        padding: 20px;
+        margin: 0;
+        border: none;
+        outline: none;
+        box-sizing: border-box;
+        
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        tab-size: 4;
+        
+        white-space: pre;
+        word-wrap: normal;
+        overflow-wrap: normal;
+        overflow: auto;
+    }
+    
+    #highlighting {
+        z-index: 1;
+        background-color: var(--bg-color);
+        color: var(--text-color);
+        pointer-events: none;
+    }
+    
+    #bibtex-input {
+        z-index: 2;
+        background-color: transparent;
+        color: transparent;
+        caret-color: var(--text-color);
+        resize: none;
+    }
+    
+    .hl-type { color: var(--type-color); font-weight: bold; }
+    .hl-key { color: var(--key-color); }
+    .hl-field { color: var(--field-color); }
+    .hl-string { color: var(--string-color); }
+    .hl-comment { color: var(--comment-color); font-style: italic; }
+
+    #toast {
+        visibility: hidden;
+        min-width: 250px;
+        background-color: rgba(var(--accent-rgb), 0.85);
+        backdrop-filter: blur(5px);
+        -webkit-backdrop-filter: blur(5px);
+        color: white;
+        text-align: center;
+        border-radius: 6px;
+        padding: 12px 20px;
+        position: fixed;
+        z-index: 100;
+        right: 30px;
+        bottom: 20px;
+        font-size: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s, bottom 0.3s;
+    }
+    #toast.show {
+        visibility: visible;
+        opacity: 1;
+        bottom: 30px;
+    }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+    <div class="sidebar-header">
+        <h2>BibTeX Tool</h2>
+        <button id="theme-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
+    </div>
+    
+    <!-- Formatting & Cleaning Group -->
+    <div class="group-label">Formatting & Cleaning</div>
+    <div class="control-group">
+        <button class="action-btn" onclick="indentEntries()">1. Indent with 2 Spaces</button>
+    </div>
+    <div class="control-group">
+        <button class="action-btn" onclick="removeExtraSpaces()" title="eg. `title =  { The Kamal }` -> `title = {The Kamal}`">2. Remove Extra Spaces</button>
+    </div>
+    <div class="control-group">
+        <button class="action-btn" onclick="lowercaseTypesAndFields()" title="eg. `@ARTICLE` -> `@article`, `Title=` -> `title=`">3. Lowercase Types & Fields</button>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <!-- Field Operations Group -->
+    <div class="group-label">Field Operations</div>
+    <div class="control-group">
+        <label for="field-order">Field Order:</label>
+        <input type="text" id="field-order" value="author,title,journal,booktitle,year,volume,number,pages,organization,publisher,doi,shorttitle">
+        <button class="action-btn" onclick="reorderFields()">4. Reorder Fields</button>
+    </div>
+    <div class="control-group">
+        <label for="cap-fields">Capitalize Fields:</label>
+        <input type="text" id="cap-fields" value="title,journal,booktitle">
+        <button class="action-btn" onclick="capitalizeFields()">5. Capitalize Fields</button>
+    </div>
+    <div class="control-group">
+        <label for="remove-fields">Remove Fields:</label>
+        <input type="text" id="remove-fields" value="abstract,url,eprint,issn,isbn,editor,location,address">
+        <button class="action-btn" onclick="removeFields()">6. Remove Fields</button>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <!-- Citations & Utilities Group -->
+    <div class="group-label">Utilities</div>
+    <div class="control-group">
+        <button class="action-btn" onclick="generateKeys()" title="If no key is available, then generates key as [AuthorYearTitle]">7. Generate Keys</button>
+    </div>
+    <div class="control-group">
+        <button class="action-btn" onclick="checkDuplicates()">8. Check Duplicates</button>
+    </div>
+</div>
+
+<div id="right-panel">
+    <div id="line-numbers">1</div>
+    <div id="editor-container">
+        <div id="highlighting" aria-hidden="true"></div>
+        <textarea id="bibtex-input" spellcheck="false" wrap="off" placeholder="% Paste your BibTeX here..."></textarea>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    const inputEl = document.getElementById('bibtex-input');
+    const highlightEl = document.getElementById('highlighting');
+    const lineNumbersEl = document.getElementById('line-numbers');
+    const toastEl = document.getElementById('toast');
+    let toastTimeout;
+
+    let isDarkTheme = true;
+    function toggleTheme() {
+        isDarkTheme = !isDarkTheme;
+        const root = document.documentElement;
+        const btn = document.getElementById('theme-btn');
+        if (isDarkTheme) {
+            root.removeAttribute('data-theme');
+            btn.innerText = '🌙';
+        } else {
+            root.setAttribute('data-theme', 'light');
+            btn.innerText = '☀️';
+        }
+    }
+
+    function logMessage(msg) {
+        toastEl.innerText = msg;
+        toastEl.classList.add('show');
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => { toastEl.classList.remove('show'); }, 3000);
+    }
+
+    function updateLineNumbers() {
+        const linesCount = inputEl.value.split('\n').length;
+        if (inputEl.dataset.linesCount != linesCount) {
+            let numbers = '';
+            for (let i = 1; i <= linesCount; i++) numbers += i + '\n';
+            lineNumbersEl.innerText = numbers;
+            inputEl.dataset.linesCount = linesCount;
+        }
+    }
+
+    function updateHighlighting() {
+        let text = inputEl.value;
+        if(text.endsWith('\n')) text += ' '; 
+        
+        text = text.replace(/[\uE000\uE001]/g, '');
+        text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        
+        let tokens = [];
+        function token(cls, str) {
+            let id = tokens.length;
+            tokens.push(`<span class="${cls}">${str}</span>`);
+            return `\uE000${id}\uE001`;
+        }
+
+        text = text.replace(/(=)(\s*)(\{(?:[^{}]|(?:\{(?:[^{}]|(?:\{[^{}]*\}))*\}))*\}|".*?"|[^{}",\s\uE000\uE001]+)/g, (m, eq, space, val) => eq + space + token('hl-string', val));
+        text = text.replace(/(%.*)/g, (m) => token('hl-comment', m));
+        text = text.replace(/^(\s*)([a-zA-Z0-9_-]+)(\s*=)/gm, (m, space, field, eq) => space + token('hl-field', field) + eq);
+        text = text.replace(/(@[a-zA-Z]+)(\s*\{)(\s*)([^,=\}\s\uE000\uE001]+)?(,?)/g, (m, type, brace, space, key, comma) => {
+            let res = token('hl-type', type) + brace + space;
+            if (key) res += token('hl-key', key);
+            res += comma;
+            return res;
+        });
+
+        let prevText;
+        do {
+            prevText = text;
+            text = text.replace(/\uE000(\d+)\uE001/g, (m, id) => tokens[id]);
+        } while (text !== prevText);
+
+        highlightEl.innerHTML = text;
+        updateLineNumbers();
+    }
+
+    inputEl.addEventListener('input', updateHighlighting);
+    inputEl.addEventListener('scroll', () => {
+        highlightEl.scrollTop = inputEl.scrollTop;
+        highlightEl.scrollLeft = inputEl.scrollLeft;
+        lineNumbersEl.scrollTop = inputEl.scrollTop;
+    });
+
+    function setEditorText(newText) {
+        inputEl.focus();
+        inputEl.select();
+        const success = document.execCommand('insertText', false, newText);
+        if (!success) {
+            inputEl.value = newText;
+            updateHighlighting();
+        }
+        inputEl.setSelectionRange(0, 0); 
+    }
+
+    // --- Parser ---
+    function parseBibtex(text) {
+        const entries = [];
+        const entryStartRegex = /@([a-zA-Z]+)\s*\{/g;
+        let match;
+        
+        while ((match = entryStartRegex.exec(text)) !== null) {
+            let type = match[1];
+            let startIndex = match.index;
+            
+            if (type.toLowerCase() === 'string' || type.toLowerCase() === 'preamble') {
+                continue;
+            }
+            
+            let bodyStartIndex = entryStartRegex.lastIndex;
+            let braceCount = 1; 
+            let i = bodyStartIndex;
+            
+            while (i < text.length && braceCount > 0) {
+                if (text[i] === '{') braceCount++;
+                if (text[i] === '}') braceCount--;
+                i++;
+            }
+            
+            let endIndex = i;
+            let entryBody = text.substring(bodyStartIndex, endIndex - 1);
+            let firstComma = entryBody.indexOf(',');
+            let firstEquals = entryBody.indexOf('=');
+            
+            let key = "";
+            let fieldsStr = "";
+            
+            if (firstComma !== -1 && (firstEquals === -1 || firstComma < firstEquals)) {
+                key = entryBody.substring(0, firstComma).trim();
+                fieldsStr = entryBody.substring(firstComma + 1);
+            } else {
+                key = "";
+                fieldsStr = entryBody;
+            }
+            
+            let fields = {};
+            let fieldKeyRegex = /([a-zA-Z0-9_-]+)\s*=\s*/g;
+            let fieldMatch;
+            
+            while ((fieldMatch = fieldKeyRegex.exec(fieldsStr)) !== null) {
+                let fKey = fieldMatch[1]; 
+                let vStart = fieldKeyRegex.lastIndex;
+                let vEnd = vStart;
+                
+                if (fieldsStr[vStart] === '{') {
+                    let fBrace = 0;
+                    for (let j = vStart; j < fieldsStr.length; j++) {
+                        if (fieldsStr[j] === '{') fBrace++;
+                        if (fieldsStr[j] === '}') fBrace--;
+                        if (fBrace === 0) { vEnd = j + 1; break; }
+                    }
+                } 
+                else if (fieldsStr[vStart] === '"') {
+                    for (let j = vStart + 1; j < fieldsStr.length; j++) {
+                        if (fieldsStr[j] === '"') { vEnd = j + 1; break; }
+                    }
+                } 
+                else {
+                    for (let j = vStart; j < fieldsStr.length; j++) {
+                        if (fieldsStr[j] === ',' || fieldsStr[j] === '\n') { vEnd = j; break; }
+                    }
+                    if (vEnd === vStart) vEnd = fieldsStr.length;
+                }
+                
+                if (vEnd > vStart) {
+                    fields[fKey] = fieldsStr.substring(vStart, vEnd).trim();
+                    fieldKeyRegex.lastIndex = vEnd;
+                }
+            }
+            entries.push({ type: type, key: key, fields: fields, start: startIndex, end: endIndex });
+            entryStartRegex.lastIndex = endIndex;
+        }
+        return entries;
+    }
+
+    function getFieldKey(entry, keyName) {
+        return Object.keys(entry.fields).find(k => k.toLowerCase() === keyName.toLowerCase());
+    }
+    function getFieldValue(entry, keyName) {
+        const k = getFieldKey(entry, keyName);
+        return k ? entry.fields[k] : null;
+    }
+    function getLineNumber(text, index) {
+        return text.substring(0, index).split('\n').length;
+    }
+
+    function applyModifiedEntries(rawText, entries) {
+        let result = "";
+        let lastEnd = 0;
+        entries.forEach(e => {
+            result += rawText.substring(lastEnd, e.start);
+            let out = `@${e.type}{${e.key},\n`;
+            for (const [k, v] of Object.entries(e.fields)) {
+                out += `  ${k} = ${v},\n`;
+            }
+            out += `}`;
+            result += out;
+            lastEnd = e.end;
+        });
+        result += rawText.substring(lastEnd);
+        return result;
+    }
+
+    // --- Format Commands ---
+
+    function indentEntries() {
+        const rawText = inputEl.value;
+        const entries = parseBibtex(rawText);
+        if(entries.length === 0) { logMessage("No valid entries found."); return; }
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Indented successfully!");
+    }
+
+    function removeExtraSpaces() {
+        const rawText = inputEl.value;
+        const entries = parseBibtex(rawText);
+        if(entries.length === 0) { logMessage("No valid entries found."); return; }
+        
+        entries.forEach(entry => {
+            for (let k in entry.fields) {
+                let val = entry.fields[k];
+                val = val.replace(/[ \t]{2,}/g, ' ');
+                val = val.replace(/^\{\s+/, '{');
+                val = val.replace(/\s+\}$/, '}');
+                val = val.replace(/^"\s+/, '"');
+                val = val.replace(/\s+"$/, '"');
+                entry.fields[k] = val;
+            }
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Removed extra spaces within fields!");
+    }
+
+    function lowercaseTypesAndFields() {
+        const rawText = inputEl.value;
+        const entries = parseBibtex(rawText);
+        if(entries.length === 0) { logMessage("No valid entries found."); return; }
+        
+        entries.forEach(entry => {
+            entry.type = entry.type.toLowerCase();
+            const lowerFields = {};
+            for (let k in entry.fields) {
+                lowerFields[k.toLowerCase()] = entry.fields[k];
+            }
+            entry.fields = lowerFields;
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Lowercased types and field names!");
+    }
+
+    function reorderFields() {
+        const rawText = inputEl.value;
+        const order = document.getElementById('field-order').value.split(',').map(s => s.trim().toLowerCase());
+        const entries = parseBibtex(rawText);
+        
+        entries.forEach(entry => {
+            const newFields = {};
+            order.forEach(f => {
+                let actualKey = getFieldKey(entry, f);
+                if(actualKey) {
+                    newFields[actualKey] = entry.fields[actualKey];
+                    delete entry.fields[actualKey];
+                }
+            });
+            for(let key in entry.fields) {
+                newFields[key] = entry.fields[key];
+            }
+            entry.fields = newFields;
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Reordered fields based on preferences!");
+    }
+
+    function capitalizeFields() {
+        const rawText = inputEl.value;
+        const capFields = document.getElementById('cap-fields').value.split(',').map(s => s.trim().toLowerCase());
+        const entries = parseBibtex(rawText);
+        const ignoreWords = ['a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from', 'by', 'of', 'in'];
+        
+        entries.forEach(entry => {
+            capFields.forEach(f => {
+                let actualKey = getFieldKey(entry, f);
+                if(actualKey) {
+                    let val = entry.fields[actualKey];
+                    let isFirstWord = true;
+                    
+                    val = val.replace(/\b([a-zA-Z]+)\b/g, (match, word) => {
+                        let lowerWord = word.toLowerCase();
+                        if (!isFirstWord && ignoreWords.includes(lowerWord)) {
+                            return lowerWord; 
+                        }
+                        isFirstWord = false;
+                        return lowerWord.charAt(0).toUpperCase() + lowerWord.slice(1);
+                    });
+                    
+                    entry.fields[actualKey] = val;
+                }
+            });
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Applied Title Case to specified fields!");
+    }
+
+    function removeFields() {
+        const rawText = inputEl.value;
+        const fieldsToRemove = document.getElementById('remove-fields').value.split(',').map(s => s.trim().toLowerCase());
+        const entries = parseBibtex(rawText);
+        
+        entries.forEach(entry => {
+            fieldsToRemove.forEach(f => {
+                let actualKey = getFieldKey(entry, f);
+                if(actualKey) delete entry.fields[actualKey];
+            });
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage(`Removed fields: ${fieldsToRemove.join(', ')}`);
+    }
+
+    // --- Complex Author Parsing & Key Generation ---
+    
+    function getFirstAuthorLastName(authorStr) {
+        let clean = authorStr.replace(/\{|\}/g, '').trim();
+        // Split by standard BibTeX separators ("and") or dirty ones ("&", ";")
+        let authors = clean.split(/\b\s+and\s+\b|\s+&\s+|;/i);
+        let firstAuthor = authors[0].trim();
+        
+        if (firstAuthor.includes(',')) {
+            // Handles "Last, First" -> grabs everything before the comma
+            let lastNamePart = firstAuthor.substring(0, firstAuthor.indexOf(',')).trim();
+            return lastNamePart.replace(/[^a-zA-Z]/g, '');
+        } else {
+            // Handles "First Last" -> grabs the last word
+            let parts = firstAuthor.split(/\s+/);
+            return parts[parts.length - 1].replace(/[^a-zA-Z]/g, '');
+        }
+    }
+
+    function generateKeys() {
+        const rawText = inputEl.value;
+        const entries = parseBibtex(rawText);
+        
+        entries.forEach(entry => {
+            // Skip generation if a valid key already exists
+            if (entry.key && entry.key.trim() !== '') {
+                return;
+            }
+
+            let person = getFieldValue(entry, 'author');
+            let year = getFieldValue(entry, 'year');
+            let shorttitle = getFieldValue(entry, 'shorttitle');
+            let title = getFieldValue(entry, 'title');
+            
+            let lastName = ''
+            if(person) {
+                lastName = getFirstAuthorLastName(person);
+            }
+            let cleanYear = ''
+            if(year) {
+                cleanYear = year.replace(/[^0-9]/g, '');
+            }
+            let titlePart = ''
+            if(shorttitle){
+                titlePart = shorttitle.replace(/[^a-zA-Z0-9]/g, '')
+            } else if(title) {
+                titlePart = title.replace(/[^a-zA-Z0-9 ]/g, '').split(' ').slice(0, 2).join('');
+            }
+
+             entry.key = lastName + cleanYear + titlePart;
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage("Generated missing keys!");
+    }
+
+    // --- Fuzzy Duplicate Checking Algorithms ---
+
+    // Standard string distance for titles
+    function levenshteinDistance(a, b) {
+        if(a.length === 0) return b.length;
+        if(b.length === 0) return a.length;
+        let matrix = [];
+        for(let i = 0; i <= b.length; i++) { matrix[i] = [i]; }
+        for(let j = 0; j <= a.length; j++) { matrix[0][j] = j; }
+        for(let i = 1; i <= b.length; i++) {
+            for(let j = 1; j <= a.length; j++) {
+                if(b.charAt(i-1) == a.charAt(j-1)) {
+                    matrix[i][j] = matrix[i-1][j-1];
+                } else {
+                    matrix[i][j] = Math.min(matrix[i-1][j-1] + 1, Math.min(matrix[i][j-1] + 1, matrix[i-1][j] + 1));
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    }
+
+    function getStringSimilarity(s1, s2) {
+        if (!s1 || !s2) return 0;
+        s1 = s1.toLowerCase().replace(/[^a-z0-9]/g, '');
+        s2 = s2.toLowerCase().replace(/[^a-z0-9]/g, '');
+        let max = Math.max(s1.length, s2.length);
+        if (max === 0) return 0;
+        return (max - levenshteinDistance(s1, s2)) / max;
+    }
+
+    // Jaccard similarity (word set overlap) for Authors to ignore formatting/ordering differences
+    function getAuthorSimilarity(a1, a2) {
+        if (!a1 || !a2) return 0;
+        
+        const getWords = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(w => w.length > 1 && w !== 'and');
+        const w1 = getWords(a1);
+        const w2 = getWords(a2);
+        
+        if (w1.length === 0 || w2.length === 0) return 0;
+        
+        let set1 = new Set(w1);
+        let set2 = new Set(w2);
+        let matchCount = 0;
+        
+        set1.forEach(w => {
+            if (set2.has(w)) matchCount++;
+        });
+        
+        let unionSize = new Set([...w1, ...w2]).size;
+        return matchCount / unionSize;
+    }
+
+    function checkDuplicates() {
+        const rawText = inputEl.value;
+        const entries = parseBibtex(rawText);
+        const exactDups = [];
+        const fuzzyDups = [];
+        const seenKeys = new Map();
+        
+        // 1. Check Exact Keys
+        entries.forEach(e => {
+            if(e.key) { 
+                let currentLine = getLineNumber(rawText, e.start);
+                if(seenKeys.has(e.key)) { 
+                    let originalLine = seenKeys.get(e.key);
+                    exactDups.push(`Key '${e.key}' at line ${originalLine} and ${currentLine}`);
+                } else { 
+                    seenKeys.set(e.key, currentLine); 
+                }
+            }
+        });
+
+        // 2. Check Fuzzy Metadata
+        for (let i = 0; i < entries.length; i++) {
+            for (let j = i + 1; j < entries.length; j++) {
+                let e1 = entries[i];
+                let e2 = entries[j];
+                
+                let l1 = getLineNumber(rawText, e1.start);
+                let l2 = getLineNumber(rawText, e2.start);
+                
+                let t1 = getFieldValue(e1, 'title');
+                let t2 = getFieldValue(e2, 'title');
+                let a1 = getFieldValue(e1, 'author');
+                let a2 = getFieldValue(e2, 'author');
+                
+                let tSim = getStringSimilarity(t1, t2);
+                let aSim = getAuthorSimilarity(a1, a2); // Uses word-set overlap
+                
+                if (t1 && t2 && tSim >= 0.90) {
+                    let k1 = e1.key || 'NoKey';
+                    let k2 = e2.key || 'NoKey';
+                    
+                    if (a1 && a2) {
+                        if (aSim >= 0.85) {
+                            fuzzyDups.push(`[${k1}] (L${l1}) & [${k2}] (L${l2}) - Title: ${Math.round(tSim*100)}%, Author: ${Math.round(aSim*100)}%`);
+                        }
+                    } else {
+                        fuzzyDups.push(`[${k1}] (L${l1}) & [${k2}] (L${l2}) - Title matches ${Math.round(tSim*100)}%`);
+                    }
+                }
+            }
+        }
+        
+        let alertMsg = [];
+        if (exactDups.length > 0) {
+            alertMsg.push(`Exact Duplicate Keys:\n- ` + exactDups.join('\n- '));
+        }
+        if (fuzzyDups.length > 0) {
+            alertMsg.push(`Potential Fuzzy Duplicates:\n- ` + fuzzyDups.join('\n- '));
+        }
+        
+        if (alertMsg.length > 0) {
+            logMessage(`Found ${exactDups.length + fuzzyDups.length} duplicate(s)!`);
+            alert(alertMsg.join('\n\n'));
+        } else {
+            logMessage("No duplicates found!");
+        }
+    }
+
+    updateHighlighting();
+</script>
+</body>
+</html>
