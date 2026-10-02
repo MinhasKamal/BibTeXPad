@@ -104,13 +104,17 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         color: #858585;
-        margin-bottom: -5px;
         font-weight: bold;
     }
 
-    .control-group { display: flex; flex-direction: column; gap: 5px; }
+    .control-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        margin-bottom: 5px;
+    }
     label { font-size: 0.9rem; font-weight: 500; }
-    input[type="text"] {
+    input {
         padding: 8px;
         background-color: var(--bg-color);
         border: 1px solid var(--border-color);
@@ -129,6 +133,8 @@
         text-align: left;
     }
     button.action-btn:hover { background-color: var(--accent-hover); }
+    
+    #indentation{ font-family: monospace; width: 7em; }
     
     /* Right Panel: Editor Area */
     #right-panel {
@@ -263,14 +269,18 @@
 
 <div id="sidebar">
     <div class="sidebar-header">
-        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeX Tool" target="_blank">BibTeX Tool</a></h2>
+        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeX Tool</a></h2>
         <button id="theme-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
     </div>
     
     <!-- Formatting & Cleaning Group -->
     <div class="group-label">Formatting & Cleaning</div>
     <div class="control-group">
-        <button class="action-btn" onclick="indentEntries()">1. Indent with 2 Spaces</button>
+        <div>
+            <label for="indentation">Indentation: </label>
+            <input type="text" id="indentation" value="	" title="Other edit buttons will also perform indentation">
+        </div>
+        <button class="action-btn" onclick="indentEntries()">1. Indent</button>
     </div>
     <div class="control-group">
         <button class="action-btn" onclick="removeExtraSpaces()" title="eg. `title =  { The Kamal }` -> `title = {The Kamal}`">2. Remove Extra Spaces</button>
@@ -289,12 +299,12 @@
         <button class="action-btn" onclick="reorderFields()">4. Reorder Fields</button>
     </div>
     <div class="control-group">
-        <label for="cap-fields">Capitalize Fields:</label>
+        <label for="cap-fields">Fields to be Capitalized:</label>
         <input type="text" id="cap-fields" value="title,journal,booktitle">
         <button class="action-btn" onclick="capitalizeFields()">5. Capitalize Fields</button>
     </div>
     <div class="control-group">
-        <label for="remove-fields">Remove Fields:</label>
+        <label for="remove-fields">Fields to be Removed:</label>
         <input type="text" id="remove-fields" value="abstract,url,eprint,issn,isbn,editor,location,address">
         <button class="action-btn" onclick="removeFields()">6. Remove Fields</button>
     </div>
@@ -304,9 +314,19 @@
     <!-- Citations & Utilities Group -->
     <div class="group-label">Utilities</div>
     <div class="control-group">
+        <div>
+            <label for="override-keys">Override Existing Keys: </label>
+            <input type="checkbox" id="override-keys">
+        </div>
         <button class="action-btn" onclick="generateKeys()" title="If no key is available, then generates key as [AuthorYearTitle]">7. Generate Keys</button>
     </div>
     <div class="control-group">
+        <div>
+            <label for="title-threshold">Title (%):</label>
+            <input type="number" id="title-threshold" value="80" min="40" max="100">
+            <label for="author-threshold">; Author (%):</label>
+            <input type="number" id="author-threshold" value="60" min="40" max="100">
+        </div>
         <button class="action-btn" onclick="checkDuplicates()">8. Check Duplicates</button>
         <textarea id="duplicate-results" readonly placeholder="Duplicates will appear here..."></textarea>
     </div>
@@ -508,11 +528,14 @@
     function applyModifiedEntries(rawText, entries) {
         let result = "";
         let lastEnd = 0;
+        
+        const indent = document.getElementById('indentation').value
+        
         entries.forEach(e => {
             result += rawText.substring(lastEnd, e.start);
             let out = `@${e.type}{${e.key},\n`;
             for (const [k, v] of Object.entries(e.fields)) {
-                out += `  ${k} = ${v},\n`;
+                out += `${indent}${k} = ${v},\n`;
             }
             out += `}`;
             result += out;
@@ -664,10 +687,11 @@
     function generateKeys() {
         const rawText = inputEl.value;
         const entries = parseBibtex(rawText);
+        const overrideKeys = document.getElementById('override-keys').checked;
         
         entries.forEach(entry => {
             // Skip generation if a valid key already exists
-            if (entry.key && entry.key.trim() !== '') {
+            if (!overrideKeys && entry.key && entry.key.trim() !== '') {
                 return;
             }
 
@@ -695,7 +719,11 @@
         });
         
         setEditorText(applyModifiedEntries(rawText, entries));
-        logMessage("Generated missing keys!");
+        if (!overrideKeys) {
+            logMessage("Generated MISSING keys!");
+        } else {
+            logMessage("Regenerated ALL keys!");
+        }
     }
 
     // --- Fuzzy Duplicate Checking Algorithms ---
@@ -757,6 +785,9 @@
         const fuzzyDups = [];
         const seenKeys = new Map();
         
+        const titleThresh = parseInt(document.getElementById('title-threshold').value, 10) / 100;
+        const authorThresh = parseInt(document.getElementById('author-threshold').value, 10) / 100;
+        
         // 1. Check Exact Keys
         entries.forEach(e => {
             if(e.key) { 
@@ -787,12 +818,13 @@
                 let tSim = getStringSimilarity(t1, t2);
                 let aSim = getAuthorSimilarity(a1, a2); // Uses word-set overlap
                 
-                if (t1 && t2 && tSim >= 0.80) {
+                if (t1 && t2 && tSim >= titleThresh) {
                     let k1 = e1.key || 'NoKey';
                     let k2 = e2.key || 'NoKey';
-                    
-                    if (a1 && a2) {
-                        if (aSim >= 0.50) {
+                  	if (k1 === k2){
+                        // do not include
+                	} else if (a1 && a2) {
+                        if (aSim >= authorThresh) {
                             fuzzyDups.push(`'${k1}' at ${l1} & '${k2}' at ${l2} - Title: ${Math.round(tSim*100)}%, Author: ${Math.round(aSim*100)}%`);
                         }
                     } else {
