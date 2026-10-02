@@ -20,6 +20,8 @@
         --field-color: #9cdcfe;
         --string-color: #ce9178;
         --comment-color: #6a9955;
+        --dup-color: #ff8c8c;
+        --dup-bg-color: #2d2d2d;
     }
 
     /* Light Theme */
@@ -37,6 +39,8 @@
         --field-color: #001080;
         --string-color: #a31515;
         --comment-color: #008000;
+        --dup-color: #d32f2f;
+        --dup-bg-color: #fff1f1;
     }
 
     body {
@@ -222,6 +226,27 @@
         opacity: 0.80;
         bottom: 30px;
     }
+    
+        /* Duplicate Results Text Area */
+    #duplicate-results {
+        display: none; /* Hidden initially */
+        width: 100%;
+        min-height: 120px;
+        background-color: var(--dup-bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--dup-color);
+        border-radius: 4px;
+        padding: 8px;
+        box-sizing: border-box;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 0.8rem;
+        resize: vertical;
+        margin-top: 5px;
+    }
+    #duplicate-results.show {
+        display: block;
+    }
+
 
     .footer {
         font-size: 0.75rem;
@@ -238,7 +263,7 @@
 
 <div id="sidebar">
     <div class="sidebar-header">
-        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeX Tool</a></h2>
+        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeX Tool" target="_blank">BibTeX Tool</a></h2>
         <button id="theme-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
     </div>
     
@@ -283,6 +308,7 @@
     </div>
     <div class="control-group">
         <button class="action-btn" onclick="checkDuplicates()">8. Check Duplicates</button>
+        <textarea id="duplicate-results" readonly placeholder="Duplicates will appear here..."></textarea>
     </div>
 
     <div class="footer"><a href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeXTool</a> by <a href="https://minhaskamal.github.io" target="_blank">Minhas Kamal</a></div>
@@ -737,7 +763,7 @@
                 let currentLine = getLineNumber(rawText, e.start);
                 if(seenKeys.has(e.key)) { 
                     let originalLine = seenKeys.get(e.key);
-                    exactDups.push(`Key '${e.key}' at line ${originalLine} and ${currentLine}`);
+                    exactDups.push(`'${e.key}' at ${originalLine} & ${currentLine}`);
                 } else { 
                     seenKeys.set(e.key, currentLine); 
                 }
@@ -761,16 +787,16 @@
                 let tSim = getStringSimilarity(t1, t2);
                 let aSim = getAuthorSimilarity(a1, a2); // Uses word-set overlap
                 
-                if (t1 && t2 && tSim >= 0.90) {
+                if (t1 && t2 && tSim >= 0.80) {
                     let k1 = e1.key || 'NoKey';
                     let k2 = e2.key || 'NoKey';
                     
                     if (a1 && a2) {
-                        if (aSim >= 0.85) {
-                            fuzzyDups.push(`[${k1}] (L${l1}) & [${k2}] (L${l2}) - Title: ${Math.round(tSim*100)}%, Author: ${Math.round(aSim*100)}%`);
+                        if (aSim >= 0.50) {
+                            fuzzyDups.push(`'${k1}' at ${l1} & '${k2}' at ${l2} - Title: ${Math.round(tSim*100)}%, Author: ${Math.round(aSim*100)}%`);
                         }
                     } else {
-                        fuzzyDups.push(`[${k1}] (L${l1}) & [${k2}] (L${l2}) - Title matches ${Math.round(tSim*100)}%`);
+                        fuzzyDups.push(`'${k1}' at ${l1} & '${k2}' at ${l2} - Title: ${Math.round(tSim*100)}%`);
                     }
                 }
             }
@@ -778,17 +804,23 @@
         
         let alertMsg = [];
         if (exactDups.length > 0) {
-            alertMsg.push(`Exact Duplicate Keys:\n- ` + exactDups.join('\n- '));
+            alertMsg.push(`# Exact Duplicate Keys:\n- ` + exactDups.join('\n- '));
         }
         if (fuzzyDups.length > 0) {
-            alertMsg.push(`Potential Fuzzy Duplicates:\n- ` + fuzzyDups.join('\n- '));
+            alertMsg.push(`# Potential Fuzzy Duplicates:\n- ` + fuzzyDups.join('\n- '));
         }
+        
+        const resultsBox = document.getElementById('duplicate-results');
         
         if (alertMsg.length > 0) {
             logMessage(`Found ${exactDups.length + fuzzyDups.length} duplicate(s)!`);
-            alert(alertMsg.join('\n\n'));
+            //alert(alertMsg.join('\n\n'));
+            resultsBox.value = alertMsg.join('\n\n');
+            resultsBox.classList.add('show');
         } else {
             logMessage("No duplicates found!");
+            resultsBox.value = "";
+            resultsBox.classList.remove('show');
         }
     }
 
