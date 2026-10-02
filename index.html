@@ -11,8 +11,8 @@
         --panel-bg: #252526;
         --text-color: #d4d4d4;
         --border-color: #3e3e42;
-        --accent: #007acc;
-        --accent-hover: #005f9e;
+        --accent: #842A2A;
+        --accent-hover: #943A3A;
         --accent-rgb: 0, 122, 204; 
         
         --key-color: #569cd6;
@@ -30,8 +30,8 @@
         --panel-bg: #f3f3f3;
         --text-color: #333333;
         --border-color: #cccccc;
-        --accent: #005f9e;
-        --accent-hover: #007acc;
+        --accent: #942A2A;
+        --accent-hover: #A44A4A;
         --accent-rgb: 0, 95, 158;
         
         --key-color: #0000ff;
@@ -76,12 +76,12 @@
         margin-bottom: 5px;
     }
     
-    .sidebar-header h2 { margin: 0; font-size: 1.3rem; color: var(--key-color); }
+    .sidebar-header h2 { margin: 0; font-size: 1.5rem; }
     
-    #title { text-decoration: none; }
+    #title { text-decoration: none; color: var(--accent); }
     
     #theme-btn {
-        background: #4A4A4A;
+        background: rgba(158, 158, 158, 0.5);
         border: none;
         color: var(--text-color);
         font-size: 1.2rem;
@@ -100,10 +100,10 @@
     }
 
     .group-label {
-        font-size: 0.75rem;
+        font-size: 0.65rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #858585;
+        color: #757575;
         font-weight: bold;
     }
 
@@ -295,18 +295,23 @@
     <div class="group-label">Field Operations</div>
     <div class="control-group">
         <label for="field-order">Field Order:</label>
-        <input type="text" id="field-order" value="author,title,journal,booktitle,year,volume,number,pages,organization,publisher,month,day,doi,shorttitle">
+        <input type="text" id="field-order" value="author,title,journal,booktitle,year,month,day,volume,number,pages,organization,publisher,shorttitle,doi">
         <button class="action-btn" onclick="reorderFields()">4. Reorder Fields</button>
     </div>
     <div class="control-group">
         <label for="cap-fields">Fields to be Capitalized:</label>
-        <input type="text" id="cap-fields" value="title,journal,booktitle">
+        <input type="text" id="cap-fields" value="title">
         <button class="action-btn" onclick="capitalizeFields()">5. Capitalize Fields</button>
     </div>
     <div class="control-group">
+        <label for="keep-fields">Fields to be Kept:</label>
+        <input type="text" id="keep-fields" value="author,title,journal,booktitle,year,shorttitle,doi">
+        <button class="action-btn" onclick="keepFields()" title="Other fields will be removed">6. Keep Fields</button>
+    </div>
+    <div class="control-group">
         <label for="remove-fields">Fields to be Removed:</label>
-        <input type="text" id="remove-fields" value="abstract,url,eprint,issn,isbn,editor,location,address">
-        <button class="action-btn" onclick="removeFields()">6. Remove Fields</button>
+        <input type="text" id="remove-fields" value="abstract,url,eprint,issn,isbn,editor,location,address,keywords">
+        <button class="action-btn" onclick="removeFields()">7. Remove Fields</button>
     </div>
 
     <hr class="sidebar-divider">
@@ -318,7 +323,7 @@
             <label for="override-keys">Override Existing Keys: </label>
             <input type="checkbox" id="override-keys">
         </div>
-        <button class="action-btn" onclick="generateKeys()" title="If no key is available, then generates key as [AuthorYearTitle]">7. Generate Keys</button>
+        <button class="action-btn" onclick="generateKeys()" title="If no key is available, then generates key as [AuthorYearTitle]">8. Generate Keys</button>
     </div>
     <div class="control-group">
         <div>
@@ -327,7 +332,7 @@
             <label for="author-threshold">; Author (%):</label>
             <input type="number" id="author-threshold" value="60" min="40" max="100">
         </div>
-        <button class="action-btn" onclick="checkDuplicates()">8. Check Duplicates</button>
+        <button class="action-btn" onclick="checkDuplicates()">9. Check Duplicates</button>
         <textarea id="duplicate-results" readonly placeholder="Duplicates will appear here..."></textarea>
     </div>
 
@@ -596,7 +601,7 @@
 
     function reorderFields() {
         const rawText = inputEl.value;
-        const order = document.getElementById('field-order').value.split(',').map(s => s.trim().toLowerCase());
+        const order = document.getElementById('field-order').value.split(/[ ,;]+/).map(s => s.trim().toLowerCase());
         const entries = parseBibtex(rawText);
         
         entries.forEach(entry => {
@@ -620,7 +625,7 @@
 
     function capitalizeFields() {
         const rawText = inputEl.value;
-        const capFields = document.getElementById('cap-fields').value.split(',').map(s => s.trim().toLowerCase());
+        const capFields = document.getElementById('cap-fields').value.split(/[ ,;]+/).map(s => s.trim().toLowerCase());
         const entries = parseBibtex(rawText);
         const ignoreWords = ['a', 'an', 'the', 'and', 'but', 'or', 'for', 'nor', 'on', 'at', 'to', 'from', 'by', 'of', 'in'];
         
@@ -648,10 +653,31 @@
         setEditorText(applyModifiedEntries(rawText, entries));
         logMessage("Applied Title Case to specified fields!");
     }
+    
+    function keepFields() {
+        const rawText = inputEl.value;
+        const fieldsToKeep = document.getElementById('keep-fields').value.split(/[ ,;]+/).map(s => s.trim().toLowerCase());
+        const entries = parseBibtex(rawText);
+        
+        entries.forEach(entry => {
+            // Get all current field keys for this entry
+            const currentKeys = Object.keys(entry.fields);
+            
+            currentKeys.forEach(k => {
+                // If the current key is NOT in our "keep" list, delete it
+                if (!fieldsToKeep.includes(k.toLowerCase())) {
+                    delete entry.fields[k];
+                }
+            });
+        });
+        
+        setEditorText(applyModifiedEntries(rawText, entries));
+        logMessage(`Removed fields except: ${fieldsToKeep.join(', ')}`);
+    }
 
     function removeFields() {
         const rawText = inputEl.value;
-        const fieldsToRemove = document.getElementById('remove-fields').value.split(',').map(s => s.trim().toLowerCase());
+        const fieldsToRemove = document.getElementById('remove-fields').value.split(/[ ,;]+/).map(s => s.trim().toLowerCase());
         const entries = parseBibtex(rawText);
         
         entries.forEach(entry => {
