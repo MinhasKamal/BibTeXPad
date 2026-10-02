@@ -74,6 +74,8 @@
     
     .sidebar-header h2 { margin: 0; font-size: 1.3rem; color: var(--key-color); }
     
+    #title { text-decoration: none; }
+    
     #theme-btn {
         background: #4A4A4A;
         border: none;
@@ -217,16 +219,26 @@
     }
     #toast.show {
         visibility: visible;
-        opacity: 1;
+        opacity: 0.80;
         bottom: 30px;
     }
+
+    .footer {
+        font-size: 0.75rem;
+        color: #555555;
+        margin-bottom: -5px;
+        text-align: center;
+        padding-top: 5em;
+    }
+
+    a { color: inherit; }
 </style>
 </head>
 <body>
 
 <div id="sidebar">
     <div class="sidebar-header">
-        <h2>BibTeX Tool</h2>
+        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeX Tool" target="_blank">BibTeX Tool</a></h2>
         <button id="theme-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
     </div>
     
@@ -272,6 +284,8 @@
     <div class="control-group">
         <button class="action-btn" onclick="checkDuplicates()">8. Check Duplicates</button>
     </div>
+
+    <div class="footer"><a href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeXTool</a> by <a href="https://minhaskamal.github.io" target="_blank">Minhas Kamal</a></div>
 </div>
 
 <div id="right-panel">
