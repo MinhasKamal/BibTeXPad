@@ -300,7 +300,7 @@
     </div>
     <div class="control-group">
         <label for="cap-fields">Fields to be Capitalized:</label>
-        <input type="text" id="cap-fields" value="title">
+        <input type="text" id="cap-fields" value="title,journal,booktitle">
         <button class="action-btn" onclick="capitalizeFields()">5. Capitalize Fields</button>
     </div>
     <div class="control-group">
@@ -637,6 +637,11 @@
                     let isFirstWord = true;
                     
                     val = val.replace(/\b([a-zA-Z]+)\b/g, (match, word) => {
+                        if (word === word.toUpperCase() || /[A-Z]/.test(word.slice(1))) {
+                            isFirstWord = false;
+                            return word;
+                        }
+                        
                         let lowerWord = word.toLowerCase();
                         if (!isFirstWord && ignoreWords.includes(lowerWord)) {
                             return lowerWord; 
