@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BibTeX Tool</title>
+<title>BibTeXPad</title>
 <style>
     /* Dark Theme (Default) */
     :root {
@@ -233,7 +233,7 @@
         bottom: 30px;
     }
     
-        /* Duplicate Results Text Area */
+    /* Duplicate Results Text Area */
     #duplicate-results {
         display: none; /* Hidden initially */
         width: 100%;
@@ -261,6 +261,77 @@
         text-align: center;
         padding-top: 5em;
     }
+	
+	/* Custom Search UI */
+    #search-box {
+        position: absolute;
+        top: 10px;
+        right: 20px;
+        background-color: var(--panel-bg);
+        border: 1px solid var(--border-color);
+        padding: 5px 10px;
+        border-radius: 4px;
+        display: none; /* Hidden initially */
+        align-items: center;
+        gap: 10px;
+        z-index: 10;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }
+    #search-box.show {
+        display: flex;
+    }
+    #search-input {
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        padding: 4px 8px;
+        border-radius: 2px;
+        outline: none;
+    }
+    #search-count {
+        font-size: 0.8rem;
+        color: #858585;
+    }
+    .close-search {
+        background: none;
+        border: none;
+        color: var(--text-color);
+        cursor: pointer;
+        font-weight: bold;
+    }
+    .close-search:hover { color: #ff8c8c; }
+	
+	    .search-nav-btn {
+        background-color: var(--bg-color);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
+        cursor: pointer;
+        padding: 4px 8px;
+        border-radius: 2px;
+        font-size: 0.8rem;
+    }
+    .search-nav-btn:hover { background-color: var(--accent); color: white; }
+    
+    .search-options {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border-left: 1px solid var(--border-color);
+        padding-left: 10px;
+        margin-right: 5px;
+    }
+    .search-options label {
+        font-size: 0.85rem;
+        cursor: pointer;
+        font-weight: bold;
+        user-select: none;
+    }
+    
+    /* Search Highlight Color */
+    .search-match {
+        background-color: rgba(255, 255, 0, 0.2);
+        border-radius: 2px;
+    }
 
     a { color: inherit; }
 </style>
@@ -269,7 +340,7 @@
 
 <div id="sidebar">
     <div class="sidebar-header">
-        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeX Tool</a></h2>
+        <h2 title="by Minhas Kamal"><a id="title" href="https://github.com/MinhasKamal/BibTeXPad" target="_blank">BibTeXPad</a></h2>
         <button id="theme-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
     </div>
     
@@ -320,7 +391,7 @@
     <div class="group-label">Utilities</div>
     <div class="control-group">
         <div>
-            <label for="override-keys">Override Existing Keys: </label>
+            <label for="override-keys">Overwrite Existing Keys: </label>
             <input type="checkbox" id="override-keys">
         </div>
         <button class="action-btn" onclick="generateKeys()" title="If no key is available, then generates key as [AuthorYearTitle]">8. Generate Keys</button>
@@ -336,12 +407,31 @@
         <textarea id="duplicate-results" readonly placeholder="Duplicates will appear here..."></textarea>
     </div>
 
-    <div class="footer"><a href="https://github.com/MinhasKamal/BibTeXTool" target="_blank">BibTeXTool</a> by <a href="https://minhaskamal.github.io" target="_blank">Minhas Kamal</a></div>
+    <div class="footer"><a href="https://github.com/MinhasKamal/BibTeXPad" target="_blank">BibTeXPad</a> by <a href="https://minhaskamal.github.io" target="_blank">Minhas Kamal</a></div>
 </div>
 
 <div id="right-panel">
     <div id="line-numbers">1</div>
     <div id="editor-container">
+		<!-- Custom Search Bar -->
+		<div id="search-box">
+			<input type="text" id="search-input" placeholder="Find...">
+			<span id="search-count">0/0</span>
+
+			<div style="display: flex; gap: 2px;">
+				<button class="search-nav-btn" id="search-prev" title="Previous (Shift+Enter)">▲</button>
+				<button class="search-nav-btn" id="search-next" title="Next (Enter)">▼</button>
+			</div>
+
+			<div class="search-options">
+				<input type="checkbox" id="search-match-case" title="Match Case">
+				<label for="search-match-case" title="Match Case">Aa</label>
+			</div>
+
+			<button class="close-search" onclick="closeSearch()">✕</button>
+		</div>
+
+		
         <div id="highlighting" aria-hidden="true"></div>
         <textarea id="bibtex-input" spellcheck="false" wrap="off" placeholder="% Paste your BibTeX here..."></textarea>
     </div>
@@ -888,6 +978,150 @@
     }
 
     updateHighlighting();
+	
+    // --- Custom Search Implementation ---
+    const searchBox = document.getElementById('search-box');
+    const searchInput = document.getElementById('search-input');
+    const searchCount = document.getElementById('search-count');
+    const searchMatchCase = document.getElementById('search-match-case');
+    const searchPrevBtn = document.getElementById('search-prev');
+    const searchNextBtn = document.getElementById('search-next');
+    
+    let searchMatches = [];
+    let currentMatchIndex = -1;
+
+    // 1. Intercept Ctrl+F / Cmd+F
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            searchBox.classList.add('show');
+            searchInput.focus();
+            searchInput.select();
+        }
+        if (e.key === 'Escape' && searchBox.classList.contains('show')) {
+            closeSearch();
+        }
+    });
+
+    function closeSearch() {
+        searchBox.classList.remove('show');
+        searchInput.value = '';
+        inputEl.focus();
+        updateHighlighting(); // Clear highlights
+    }
+
+    // 2. Perform safe highlighting with Match Case support
+    function performSearch() {
+        updateHighlighting(); // Reset base syntax highlighting
+        let query = searchInput.value;
+        let isMatchCase = searchMatchCase.checked;
+        
+        searchMatches = [];
+        currentMatchIndex = -1;
+        
+        if (query.length === 0) {
+            searchCount.innerText = "0/0";
+            return;
+        }
+
+        let searchTarget = isMatchCase ? query : query.toLowerCase();
+
+        // TreeWalker safely traverses ONLY text nodes
+        const walker = document.createTreeWalker(highlightEl, NodeFilter.SHOW_TEXT, null, false);
+        const nodes = [];
+        let node;
+        while (node = walker.nextNode()) nodes.push(node);
+
+        nodes.forEach(n => {
+            let text = n.nodeValue;
+            let evalText = isMatchCase ? text : text.toLowerCase();
+            let startIndex = 0;
+            let matchIndex;
+
+            while ((matchIndex = evalText.indexOf(searchTarget, startIndex)) > -1) {
+                let matchText = text.substring(matchIndex, matchIndex + query.length);
+                let beforeText = text.substring(0, matchIndex);
+                let afterText = text.substring(matchIndex + query.length);
+
+                let wrapper = document.createElement('span');
+                wrapper.className = 'search-match';
+                wrapper.innerText = matchText;
+
+                n.nodeValue = beforeText;
+                n.parentNode.insertBefore(wrapper, n.nextSibling);
+                
+                let afterNode = document.createTextNode(afterText);
+                n.parentNode.insertBefore(afterNode, wrapper.nextSibling);
+
+                searchMatches.push(wrapper);
+
+                // Move to the next chunk of text
+                n = afterNode;
+                text = afterText;
+                evalText = isMatchCase ? text : text.toLowerCase();
+                startIndex = 0; 
+            }
+        });
+
+        if (searchMatches.length > 0) {
+            currentMatchIndex = 0;
+            updateSearchScroll();
+        } else {
+            searchCount.innerText = "0/0";
+        }
+    }
+
+    // 3. Navigation Logic
+    function navigateSearch(reverse = false) {
+        if (searchMatches.length === 0) return;
+        if (reverse) {
+            currentMatchIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+        } else {
+            currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+        }
+        updateSearchScroll();
+    }
+
+    function updateSearchScroll() {
+        searchCount.innerText = `${currentMatchIndex + 1}/${searchMatches.length}`;
+        
+        // Update highlight colors
+        searchMatches.forEach(m => m.style.backgroundColor = 'rgba(255, 255, 0, 0.2)');
+        let activeMatch = searchMatches[currentMatchIndex];
+        activeMatch.style.backgroundColor = 'rgba(205, 205, 0, 0.5)'; // Orange for active
+
+        // Get current scroll and height metrics
+        const editorHeight = inputEl.clientHeight;
+        const currentScroll = inputEl.scrollTop;
+        const matchOffset = activeMatch.offsetTop;
+        
+        // Define the comfortable visible area (with an 80px buffer from the top and bottom)
+        const topBoundary = currentScroll + 80;
+        const bottomBoundary = currentScroll + editorHeight - 80;
+
+        // ONLY scroll if the match is outside the current visible area
+        if (matchOffset < topBoundary || matchOffset > bottomBoundary) {
+            // Subtract half the editor height to push the match to the middle
+            const centeredScrollPos = matchOffset - (editorHeight / 2); 
+            inputEl.scrollTop = centeredScrollPos > 0 ? centeredScrollPos : 0;
+        }
+    }
+
+
+    // Attach Event Listeners
+    searchInput.addEventListener('input', performSearch);
+    searchMatchCase.addEventListener('change', performSearch); // Re-run search if checkbox toggled
+    
+    searchNextBtn.addEventListener('click', () => navigateSearch(false));
+    searchPrevBtn.addEventListener('click', () => navigateSearch(true));
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            navigateSearch(e.shiftKey); // Shift+Enter goes backwards
+        }
+    });
+
 </script>
 </body>
 </html>
